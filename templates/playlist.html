@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ playlist.title }}</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 1100px;
+            margin: 48px auto;
+            padding: 0 24px 100px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+        }
+        .back { color: #666; text-decoration: none; font-size: 0.9rem; }
+        .back:hover { color: #fff; }
+        h1 { margin: 12px 0 4px; font-size: 1.6rem; }
+        .sub { color: #666; margin: 0 0 20px; font-size: 0.9rem; }
+        .cached { color: #555; font-size: 0.8rem; }
+        .live { color: #4a9; font-size: 0.8rem; }
+        .refresh { color: #555; font-size: 0.8rem; }
+        .refresh:hover { color: #fff; }
+        .save-sorted-btn { background: none; border: none; color: #555; font-size: 0.8rem; cursor: pointer; padding: 0; }
+        .save-sorted-btn:hover { color: #fff; }
+
+        /* Filter */
+        .filter-bar { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+        .filter-bar input {
+            flex: 1;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .filter-bar input:focus { border-color: #555; }
+        .btn-select {
+            padding: 8px 14px;
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-select:hover { background: #2a2a2a; color: #fff; }
+        .filter-count { color: #555; font-size: 0.8rem; margin-bottom: 16px; min-height: 1em; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 2px solid #2a2a2a;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+        }
+        thead th a { color: #666; text-decoration: none; }
+        thead th.active a { color: #fff; }
+        thead th a:hover { color: #ccc; }
+        tbody td { padding: 7px 12px; border-bottom: 1px solid #181818; font-size: 0.92rem; }
+        tbody tr:hover td { background: #181818; }
+        tbody tr.selected td { background: #1a2a1a; }
+        .col-check { width: 36px; }
+        .col-check input[type=checkbox] { cursor: pointer; accent-color: #4a9; width: 15px; height: 15px; }
+        .num { color: #444; width: 40px; font-size: 0.8rem; }
+        .title { color: #e0e0e0; }
+        .artist { color: #aaa; }
+        .year { color: #666; width: 52px; font-variant-numeric: tabular-nums; }
+        .added { color: #555; width: 96px; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+        .dur { color: #555; text-align: right; width: 56px; font-variant-numeric: tabular-nums; }
+
+        /* Action bar */
+        .action-bar {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #1a1a1a;
+            border-top: 1px solid #2a2a2a;
+            padding: 14px 24px;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+        }
+        .action-bar.visible { display: flex; }
+        .action-bar .sel-count { color: #aaa; font-size: 0.9rem; white-space: nowrap; }
+        .action-bar input[type=text] {
+            flex: 1;
+            padding: 8px 12px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            outline: none;
+            max-width: 360px;
+        }
+        .action-bar input[type=text]:focus { border-color: #4a9; }
+        .btn-create {
+            padding: 8px 18px;
+            background: #4a9;
+            border: none;
+            border-radius: 4px;
+            color: #000;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-create:hover { background: #5ba; }
+        .btn-create:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .btn-clear { color: #555; font-size: 0.85rem; cursor: pointer; background: none; border: none; }
+        .btn-clear:hover { color: #fff; }
+        .quota-info { font-size: 0.78rem; white-space: nowrap; }
+        .quota-ok   { color: #4a9; }
+        .quota-warn { color: #ca6; }
+        .quota-over { color: #c55; }
+    </style>
+</head>
+<body>
+    <a class="back" href="/">← All Playlists</a>
+    <h1>{{ playlist.title }}</h1>
+    <p class="sub">
+        {{ tracks | length }} songs &mdash; click a column header to sort
+        &nbsp;|&nbsp;
+        {% if from_cache %}<span class="cached">cached</span>{% else %}<span class="live">live</span>{% endif %}
+        &nbsp;<a class="refresh" href="/playlist/{{ playlist_id }}?sort_by={{ sort_by }}&order={{ order }}&refresh=true">&#8635; refresh</a>
+        &nbsp;|&nbsp;<button class="save-sorted-btn" id="btn-save-sorted" type="button">Save sorted copy…</button>
+    </p>
+    <script>
+        const PLAYLIST_TITLE = {{ playlist.title | tojson }};
+        const SORT_BY = {{ sort_by | tojson }};
+    </script>
+
+    <div class="filter-bar">
+        <input type="text" id="filter" placeholder="Filter by title or artist…">
+        <button class="btn-select" id="btn-select-visible">Select visible</button>
+        <button class="btn-select" id="btn-deselect-all">Deselect all</button>
+    </div>
+    <div class="filter-count" id="filter-count"></div>
+
+    {% macro sort_link(field, label) %}
+        {% set toggle = 'desc' if sort_by == field and order == 'asc' else 'asc' %}
+        {% set arrow  = ' ▲' if sort_by == field and order == 'asc' else (' ▼' if sort_by == field and order == 'desc' else '') %}
+        <th class="{{ 'active' if sort_by == field }}">
+            <a href="/playlist/{{ playlist_id }}?sort_by={{ field }}&order={{ toggle }}">{{ label }}{{ arrow }}</a>
+        </th>
+    {% endmacro %}
+
+    <table id="song-table">
+        <thead>
+            <tr>
+                <th class="col-check"><input type="checkbox" id="check-all" title="Select all visible"></th>
+                <th class="num">#</th>
+                {{ sort_link('title',    'Title') }}
+                {{ sort_link('artist',   'Artist') }}
+                {{ sort_link('year',     'Year') }}
+                {{ sort_link('added',    'Added') }}
+                {{ sort_link('duration', 'Time') }}
+            </tr>
+        </thead>
+        <tbody>
+        {% for track in tracks %}
+            <tr data-video-id="{{ track.video_id }}">
+                <td class="col-check"><input type="checkbox" class="song-check" value="{{ track.video_id }}"></td>
+                <td class="num">{{ loop.index }}</td>
+                <td class="title">{{ track.title or '—' }}</td>
+                <td class="artist">{{ track.artist or '—' }}</td>
+                <td class="year">{{ track.release_year or '—' }}</td>
+                <td class="added">{{ track.added_date or '—' }}</td>
+                <td class="dur">{{ track.duration or '—' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Action bar (appears when songs are selected) -->
+    <form id="create-form" method="post" action="/create-playlist">
+        <div class="action-bar" id="action-bar">
+            <span class="sel-count" id="sel-count"></span>
+            <input type="text" name="title" id="new-playlist-title" placeholder="New playlist name…" autocomplete="off">
+            <div id="hidden-ids"></div>
+            <span class="quota-info" id="quota-info"></span>
+            <button type="submit" class="btn-create" id="btn-create">Create Playlist</button>
+            <button type="button" class="btn-clear" id="btn-clear">✕ clear</button>
+        </div>
+    </form>
+
+    <script>
+        const filterInput   = document.getElementById('filter');
+        const filterCount   = document.getElementById('filter-count');
+        const checkAll      = document.getElementById('check-all');
+        const actionBar     = document.getElementById('action-bar');
+        const selCount      = document.getElementById('sel-count');
+        const hiddenIds     = document.getElementById('hidden-ids');
+        const newTitle      = document.getElementById('new-playlist-title');
+        const btnCreate     = document.getElementById('btn-create');
+        const btnSelectVis  = document.getElementById('btn-select-visible');
+        const btnDeselectAll= document.getElementById('btn-deselect-all');
+        const btnClear      = document.getElementById('btn-clear');
+        const quotaInfo     = document.getElementById('quota-info');
+
+        const DAILY_QUOTA   = 10000;
+        const COST_PER_SONG = 50;  // playlistItems.insert = 50 units each
+        const COST_CREATE   = 50;  // playlists.insert = 50 units
+
+        function quotaClass(cost) {
+            if (cost > DAILY_QUOTA * 0.9) return 'quota-over';
+            if (cost > DAILY_QUOTA * 0.5) return 'quota-warn';
+            return 'quota-ok';
+        }
+
+        const allRows = Array.from(document.querySelectorAll('tbody tr'));
+        const total   = allRows.length;
+
+        function visibleRows()   { return allRows.filter(r => r.style.display !== 'none'); }
+        function checkedBoxes()  { return allRows.flatMap(r => [...r.querySelectorAll('.song-check')].filter(c => c.checked)); }
+
+        function updateActionBar() {
+            const checked = checkedBoxes();
+            const n = checked.length;
+            allRows.forEach(r => r.classList.toggle('selected', r.querySelector('.song-check').checked));
+
+            if (n > 0) {
+                selCount.textContent = `${n} song${n > 1 ? 's' : ''} selected`;
+                actionBar.classList.add('visible');
+                hiddenIds.innerHTML = checked.map(c => `<input type="hidden" name="video_ids" value="${c.value}">`).join('');
+
+                const cost = COST_CREATE + n * COST_PER_SONG;
+                const cls  = quotaClass(cost);
+                let msg = `~${cost.toLocaleString()} / ${DAILY_QUOTA.toLocaleString()} quota units`;
+                if (cls === 'quota-over') msg += ' ⚠ likely to fail';
+                else if (cls === 'quota-warn') msg += ' ⚠ high usage';
+                quotaInfo.innerHTML = `<span class="${cls}">${msg}</span>`;
+            } else {
+                actionBar.classList.remove('visible');
+                hiddenIds.innerHTML = '';
+                quotaInfo.innerHTML = '';
+            }
+
+            btnCreate.disabled = n === 0 || !newTitle.value.trim();
+        }
+
+        // Filter
+        filterInput.addEventListener('input', () => {
+            const q = filterInput.value.toLowerCase().trim();
+            let visible = 0;
+            allRows.forEach(row => {
+                const show = !q || row.textContent.toLowerCase().includes(q);
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            filterCount.textContent = q ? `${visible} of ${total} songs` : '';
+        });
+
+        // Individual checkboxes
+        document.querySelectorAll('.song-check').forEach(cb => {
+            cb.addEventListener('change', updateActionBar);
+        });
+
+        // Select-all header checkbox
+        checkAll.addEventListener('change', () => {
+            visibleRows().forEach(r => r.querySelector('.song-check').checked = checkAll.checked);
+            updateActionBar();
+        });
+
+        // Select visible button
+        btnSelectVis.addEventListener('click', () => {
+            visibleRows().forEach(r => r.querySelector('.song-check').checked = true);
+            updateActionBar();
+        });
+
+        // Deselect all
+        btnDeselectAll.addEventListener('click', () => {
+            allRows.forEach(r => r.querySelector('.song-check').checked = false);
+            checkAll.checked = false;
+            updateActionBar();
+        });
+
+        // Clear button in action bar
+        btnClear.addEventListener('click', () => {
+            allRows.forEach(r => r.querySelector('.song-check').checked = false);
+            checkAll.checked = false;
+            updateActionBar();
+        });
+
+        // Enable/disable Create button based on title input
+        newTitle.addEventListener('input', () => {
+            btnCreate.disabled = checkedBoxes().length === 0 || !newTitle.value.trim();
+        });
+
+        // Save sorted copy — select all rows in current order, pre-fill name
+        document.getElementById('btn-save-sorted').addEventListener('click', () => {
+            allRows.forEach(r => r.querySelector('.song-check').checked = true);
+            checkAll.checked = true;
+            const label = SORT_BY === 'title' ? 'title' : SORT_BY === 'artist' ? 'artist' :
+                          SORT_BY === 'year' ? 'year' : SORT_BY === 'added' ? 'date added' : 'duration';
+            newTitle.value = `${PLAYLIST_TITLE} (by ${label})`;
+            updateActionBar();
+            newTitle.focus();
+            newTitle.select();
+        });
+    </script>
+</body>
+</html>

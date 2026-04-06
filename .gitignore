@@ -1,0 +1,11 @@
+oauth.json
+cache/
+browser.json
+token.json
+credentials.json
+hidden.json
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/

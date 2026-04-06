@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Duplicate Songs</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 1100px;
+            margin: 48px auto;
+            padding: 0 24px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+        }
+        .back { color: #666; text-decoration: none; font-size: 0.9rem; }
+        .back:hover { color: #fff; }
+        h1 { margin: 12px 0 4px; font-size: 1.6rem; }
+        .sub { color: #666; margin: 0 0 28px; font-size: 0.9rem; }
+        .empty { color: #555; margin-top: 32px; font-size: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 2px solid #2a2a2a;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #666;
+            white-space: nowrap;
+        }
+        tbody td { padding: 8px 12px; border-bottom: 1px solid #181818; font-size: 0.9rem; vertical-align: top; }
+        tbody tr:hover td { background: #181818; }
+        .title { color: #e0e0e0; }
+        .artist { color: #aaa; }
+        .year { color: #666; width: 52px; }
+        .count-badge {
+            display: inline-block;
+            background: #2a2a2a;
+            color: #888;
+            font-size: 0.75rem;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-right: 6px;
+            white-space: nowrap;
+        }
+        .playlists { color: #666; font-size: 0.85rem; }
+        .pl-link { color: #4a9; text-decoration: none; margin-right: 8px; white-space: nowrap; }
+        .pl-link:hover { color: #5ba; }
+        .filter-bar { margin-bottom: 16px; }
+        .filter-bar input {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .filter-bar input:focus { border-color: #555; }
+    </style>
+</head>
+<body>
+    <a class="back" href="/duplicates">← Back to Playlist Selection</a>
+    <h1>Duplicate Songs</h1>
+
+    {% if duplicates %}
+    <p class="sub">{{ total }} song{{ 's' if total != 1 }} appear in more than one playlist</p>
+
+    <div class="filter-bar">
+        <input type="text" id="filter" placeholder="Filter by title or artist…">
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Artist</th>
+                <th>Year</th>
+                <th>Found In</th>
+            </tr>
+        </thead>
+        <tbody id="tbody">
+        {% for dup in duplicates %}
+            <tr>
+                <td class="title">{{ dup.title or '—' }}</td>
+                <td class="artist">{{ dup.artist or '—' }}</td>
+                <td class="year">{{ dup.release_year or '—' }}</td>
+                <td class="playlists">
+                    <span class="count-badge">{{ dup.count }}×</span>
+                    {% for pl in dup.playlists %}
+                        <a class="pl-link" href="/playlist/{{ pl.id }}">{{ pl.title }}</a>
+                    {% endfor %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No duplicate songs found across the selected playlists.</p>
+    {% endif %}
+
+    <script>
+        const input = document.getElementById('filter');
+        const rows  = input ? Array.from(document.querySelectorAll('#tbody tr')) : [];
+        if (input) {
+            input.addEventListener('input', () => {
+                const q = input.value.toLowerCase().trim();
+                rows.forEach(r => {
+                    r.style.display = !q || r.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+        }
+    </script>
+</body>
+</html>
